@@ -32,7 +32,7 @@ var errTooManyBatchers = consumererror.NewPermanent(errors.New("too many batcher
 // batch_processor is a component that accepts spans and metrics, places them
 // into batches and sends downstream.
 //
-// batch_processor implements consumer.Traces and consumer.Metrics
+// batch_processor implements consumer.Traces and consumer.Metrics(exports batched metrics or traces)
 //
 // Batches are sent out with any of the following conditions:
 // - batch size reaches cfg.SendBatchSize
@@ -422,9 +422,10 @@ func newBatchMetrics(nextConsumer consumer.Metrics) *batchMetrics {
 	return &batchMetrics{nextConsumer: nextConsumer, metricData: pmetric.NewMetrics(), sizer: &pmetric.ProtoMarshaler{}}
 }
 
+// sends out the batched data 
 func (bm *batchMetrics) export(ctx context.Context, sendBatchMaxSize int, returnBytes bool) (int, int, error) {
-	var req pmetric.Metrics
-	var sent int
+	var req pmetric.Metrics // req is required batched data to send
+	var sent int // "boolean" 
 	var bytes int
 	if sendBatchMaxSize > 0 && bm.dataPointCount > sendBatchMaxSize {
 		req = splitMetrics(sendBatchMaxSize, bm.metricData)
@@ -437,7 +438,7 @@ func (bm *batchMetrics) export(ctx context.Context, sendBatchMaxSize int, return
 		bm.dataPointCount = 0
 	}
 	if returnBytes {
-		bytes = bm.sizer.MetricsSize(req)
+		bytes = bm.sizer.MetricsSize(req) // send number of bytes only if requested, gets the number of bytes of grouped data
 	}
 	return sent, bytes, bm.nextConsumer.ConsumeMetrics(ctx, req)
 }
